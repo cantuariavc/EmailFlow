@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>AutoU - Case Prático</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Case AutoU 🚀</h1>
+      <p>Classificador Inteligente de E-mails por Produtividade</p>
+    </header>
+
+    <main>
+      <form
+        id="email-form"
+        method="POST"
+        enctype="multipart/form-data"
+      >
+        <div class="form-group">
+          <label for="email_text">
+            Cole o texto do e-mail abaixo:
+          </label>
+          <textarea
+            id="email_text"
+            name="email_text"
+            rows="10"
+            placeholder="Ex: Olá, gostaria de saber o status do meu pedido..."
+          ></textarea>
+        </div>
+        <div class="form-group separator">
+          <span>OU</span>
+        </div>
+        <div class="form-group">
+          <label for="email_file">Faça o upload de um arquivo (.txt ou .pdf):</label>
+          <input type="file" id="email_file" name="email_file" accept=".txt,.pdf">
+        </div>
+        <button
+          class="reset-button"
+          type="reset"
+          id="reset-btn"
+        >
+          Limpar formulário
+        </button>
+        <button
+          class="submit-button"
+          type="submit"
+          id="submit-btn"
+        >
+          Classificar e-mail e sugerir resposta
+        </button>
+      </form>
+
+      <div id="results-container" class="hidden">
+        <h2>Resultados da Análise</h2>
+        <div id="result-category">
+          <strong>Categoria:</strong> <span id="category"></span>
+        </div>
+        <div id="result-response">
+          <strong>Resposta Sugerida:</strong>
+          <p id="suggested-response"></p>
+        </div>
+      </div>
+
+      <div id="loading" class="hidden">
+        <p>Analisando... Isso pode levar alguns segundos.</p>
+      </div>
+
+      <div id="error-container" class="hidden">
+        <p id="error-message"></p>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
