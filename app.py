@@ -1,11 +1,11 @@
 from flask import Flask, render_template, request, jsonify
-from utils.nlp_utils import extract_text_from_file
+from utils.nlp_utils import extract_text_from_file, preprocess_text
 
 
 app = Flask(__name__)
 
 
-@app.get("/")
+@app.route("/")
 def index():
     return render_template("index.html")
 
@@ -25,12 +25,17 @@ def process_email():
         if not email_text:
             return jsonify({"error": "Não foi possível ler o arquivo fornecido"}), 400
 
-        return email_text
-
-    if "email_text" in request.form:
+    elif "email_text" in request.form:
         email_text = request.form["email_text"]
 
     if not email_text:
         return jsonify({"error": "Nenhum texto ou arquivo de e-mail fornecido"}), 400
 
-    return email_text
+    processed_tokens = preprocess_text(email_text)
+
+    return jsonify(
+        {
+            "email_text": email_text,
+            "tokens": processed_tokens,
+        }
+    )
