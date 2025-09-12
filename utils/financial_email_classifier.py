@@ -2,6 +2,7 @@ import re
 import logging
 from typing import Dict, List, Any
 from .openai_client import OpenAIClient
+from .huggingface_client import HuggingFaceClient
 from .nlp_utils import preprocess_text
 from config import Config
 
@@ -21,6 +22,11 @@ class FinancialEmailClassifier:
 
     def __init__(self):
         self.openai_client = OpenAIClient()
+        self.huggingface_client = (
+            HuggingFaceClient(config.HUGGINGFACE_MODEL)
+            if config.HUGGINGFACE_ENABLED
+            else None
+        )
 
         self.produtivo_patterns = [
             r"\b(status|situação|andamento|progresso|atualização|atualizar)\b",
@@ -58,18 +64,6 @@ class FinancialEmailClassifier:
         self.response_templates = {
             "produtivo": "Obrigado pelo contato. Sua solicitação foi registrada e está sendo processada por nossa equipe. Retornaremos em até 24 horas úteis com as informações solicitadas.",
             "improdutivo": "Obrigado pela mensagem. Caso tenha alguma solicitação específica relacionada aos nossos serviços, estarei à disposição para ajudar.",
-        }
-
-    def classify_email(self, email_text: str) -> Dict[str, Any]:
-        """
-        Classifica um email do setor financeiro (wrapper para analyze_email)
-        """
-        result = self.analyze_email(email_text)
-        return {
-            "category": result["category"],
-            "confidence": result["confidence"],
-            "method": result["method"],
-            "reasoning": result["reasoning"],
         }
 
     def _classify_by_rules(self, email_text: str) -> Dict[str, Any]:
@@ -211,6 +205,23 @@ class FinancialEmailClassifier:
                     }
             except Exception as e:
                 logger.error(f"Erro na classificação OpenAI: {e}")
+
+        if self.huggingface_client and self.huggingface_client.is_available():
+            try:
+                hf_result = self.huggingface_client.classify_email(processed_text)
+                if (
+                    hf_result
+                    and hf_result.get("confidence", 0)
+                    > config.HUGGINGFACE_CONFIDENCE_THRESHOLD
+                ):
+                    return {
+                        "category": hf_result["category"],
+                        "confidence": hf_result["confidence"],
+                        "method": "huggingface",
+                        "reasoning": hf_result.get("reasoning", ""),
+                    }
+            except Exception as e:
+                logger.error(f"Erro na classificação Hugging Face: {e}")
 
         return self._classify_by_rules(email_text)
 
