@@ -2,75 +2,168 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
-  <title>AutoU - Case Prático</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EmailFlow</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
   <div class="container">
-    <header>
-      <h1>Case AutoU 🚀</h1>
-      <p>Classificador Inteligente de E-mails por Produtividade</p>
-    </header>
+    <div class="main-layout">
+      <header class="header-section">
+        <div class="logo">
+          <i class="fas fa-robot"></i>
+          <h1>EmailFlow</h1>
+        </div>
+        <p class="subtitle">Classificador Inteligente de E-mails por Produtividade</p>
+        <div class="description">
+          <p>Esta ferramenta utiliza inteligência artificial e regras pré definidas para analisar e-mails e classificá-los automaticamente, além de sugerir respostas para aumentar sua produtividade.</p>
+        </div>
+      </header>
 
-    <main>
-      <form
-        id="email-form"
-        method="POST"
-        enctype="multipart/form-data"
-      >
-        <div class="form-group">
-          <label for="email_text">
-            Cole o texto do e-mail abaixo:
-          </label>
-          <textarea
-            id="email_text"
-            name="email_text"
-            rows="10"
-            placeholder="Ex: Olá, gostaria de saber o status do meu pedido..."
-          ></textarea>
+      <main class="main-content">
+        <section class="form-section">
+        <div id="form-overlay" class="form-overlay hidden">
+          <div class="overlay-content">
+            <div class="overlay-spinner">
+              <i class="fas fa-spinner fa-spin"></i>
+            </div>
+            <p class="overlay-text">Analisando seu email...</p>
+            <p class="overlay-subtext">Isso pode levar alguns segundos</p>
+          </div>
         </div>
-        <div class="form-group separator">
-          <span>OU</span>
-        </div>
-        <div class="form-group">
-          <label for="email_file">Faça o upload de um arquivo (.txt ou .pdf):</label>
-          <input type="file" id="email_file" name="email_file" accept=".txt,.pdf">
-        </div>
-        <button
-          class="reset-button"
-          type="reset"
-          id="reset-btn"
-        >
-          Limpar formulário
-        </button>
-        <button
-          class="submit-button"
-          type="submit"
-          id="submit-btn"
-        >
-          Classificar e-mail e sugerir resposta
-        </button>
-      </form>
+        <form id="email-form" action="/analyze" method="POST" enctype="multipart/form-data" class="email-form">
+          <!-- Sistema de Abas -->
+          <div class="tabs-container">
+            <div class="tabs-header">
+              <button type="button" class="tab-button active" data-tab="text-tab">
+                <i class="fas fa-envelope"></i>
+                Texto do E-mail
+              </button>
+              <button type="button" class="tab-button" data-tab="file-tab">
+                <i class="fas fa-upload"></i>
+                Upload de Arquivo
+              </button>
+            </div>
 
-      <div id="results-container" class="hidden">
-        <h2>Resultados da Análise</h2>
-        <div id="result-category">
-          <strong>Categoria:</strong> <span id="category"></span>
-        </div>
-        <div id="result-response">
-          <strong>Resposta Sugerida:</strong>
-          <p id="suggested-response"></p>
-        </div>
-      </div>
+            <!-- Aba de Texto -->
+            <div id="text-tab" class="tab-content active">
+              <div class="form-group">
+                <label for="email_text" class="form-label">
+                  <i class="fas fa-envelope"></i>
+                  Cole o texto do e-mail abaixo:
+                </label>
+                <textarea
+                  id="email_text"
+                  name="email_text"
+                  rows="8"
+                  placeholder="Ex: Olá, gostaria de saber o status do meu pedido..."
+                  class="form-textarea"
+                ></textarea>
+                <div class="char-counter">
+                  <span id="char-count">0</span> caracteres
+                </div>
+              </div>
+            </div>
 
-      <div id="loading" class="hidden">
-        <p>Analisando... Isso pode levar alguns segundos.</p>
-      </div>
+            <!-- Aba de Arquivo -->
+            <div id="file-tab" class="tab-content">
+              <div class="form-group">
+                <label for="email_file" class="form-label">
+                  <i class="fas fa-upload"></i>
+                  Faça o upload de um arquivo (.txt ou .pdf):
+                </label>
+                <div class="file-upload-container">
+                  <input type="file" id="email_file" name="email_file" accept=".txt,.pdf" class="file-input">
+                  <label for="email_file" class="file-upload-label">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <span class="file-text">Escolher arquivo</span>
+                    <span class="file-name" id="file-name">Nenhum arquivo selecionado</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
 
-      <div id="error-container" class="hidden">
+          <div class="form-actions">
+            <button type="button" id="reset-btn" class="btn btn-secondary" onclick="clearForm()">
+              <i class="fas fa-eraser"></i>
+              Limpar
+            </button>
+            <button type="submit" id="submit-btn" class="btn btn-primary">
+              <i class="fas fa-magic"></i>
+              <span class="btn-text">Analisar E-mail</span>
+              <div class="btn-loading hidden">
+                <i class="fas fa-spinner fa-spin"></i>
+                Analisando...
+              </div>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section id="results-container" class="results-section hidden">
+        <div class="results-header">
+          <h2>
+            <i class="fas fa-chart-line"></i>
+            Resultados da Análise
+          </h2>
+          <button class="btn btn-small btn-outline" id="back-to-form">
+            <i class="fas fa-arrow-left"></i>
+            Nova Análise
+          </button>
+        </div>
+
+        <div class="results-content">
+          <div class="result-item category-result">
+            <div class="result-icon">
+              <i class="fas fa-tag"></i>
+            </div>
+            <div class="result-content">
+              <h3>Categoria</h3>
+              <div class="category-badge" id="category-badge">
+                <span id="category"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="result-item response-result">
+            <div class="result-icon">
+              <i class="fas fa-reply"></i>
+            </div>
+            <div class="result-content">
+              <h3>Resposta Sugerida</h3>
+              <div class="response-content">
+                <p id="suggested-response"></p>
+                <button class="btn btn-small btn-outline" id="copy-response">
+                  <i class="fas fa-copy"></i>
+                  Copiar resposta
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+
+      <div id="error-container" class="error-container hidden">
+        <div class="error-icon">
+          <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <h3>Ops! Algo deu errado</h3>
         <p id="error-message"></p>
+        <button class="btn btn-primary" onclick="location.reload()">
+          <i class="fas fa-refresh"></i>
+          Tentar novamente
+        </button>
       </div>
-    </main>
+      </div>
+      </main>
+    </div>
   </div>
+
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>
