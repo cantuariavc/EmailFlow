@@ -2,13 +2,17 @@ from flask import Flask, render_template, request, jsonify
 from config import Config
 from utils.nlp_utils import extract_text_from_file
 from utils.financial_email_classifier import FinancialEmailClassifier
-
+import os
 
 config = Config()
 
 app = Flask(__name__)
 
 email_classifier = FinancialEmailClassifier()
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
 
 
 @app.route("/")

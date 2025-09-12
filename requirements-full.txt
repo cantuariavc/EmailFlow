@@ -3,6 +3,9 @@ gunicorn==23.0.0
 nltk==3.8.1
 pdfplumber==0.11.7
 openai==1.107.1
+transformers==4.56.1
+torch==2.8.0
+torchvision==0.23.0
 python-dotenv==1.0.0
 numpy==2.3.3
 Pillow==11.3.0

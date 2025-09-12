@@ -24,7 +24,7 @@ class Config:
         "HUGGINGFACE_MODEL", "nlptown/bert-base-multilingual-uncased-sentiment"
     )
     HUGGINGFACE_ENABLED: bool = (
-        os.getenv("HUGGINGFACE_ENABLED", "True").lower() == "true"
+        os.getenv("HUGGINGFACE_ENABLED", "False").lower() == "true"
     )
     HUGGINGFACE_CONFIDENCE_THRESHOLD: float = float(
         os.getenv("HUGGINGFACE_CONFIDENCE_THRESHOLD", "0.3")
