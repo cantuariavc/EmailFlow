@@ -11,8 +11,8 @@ config = Config()
 MIN_CONFIDENCE_OPENAI = 0.7
 MIN_CONFIDENCE_RESPONSE = 0.8
 MIN_RESPONSE_LENGTH = 20
-PRODUTIVO_THRESHOLD = 2.0
-IMPRODUTIVO_THRESHOLD = 1.5
+PRODUTIVO_THRESHOLD = 10.0
+IMPRODUTIVO_THRESHOLD = 5.0
 
 
 class FinancialEmailClassifier:
@@ -46,6 +46,12 @@ class FinancialEmailClassifier:
             r"\b(preciso\s+de|necessito|gostaria\s+de)\b",
             r"\b(quando\s+será|quando\s+posso|quando\s+está)\b",
             r"\b(por\s+favor|favor\s+verificar)\b",
+            r"\b(solicitação\s+de\s+crédito|pedido\s+de\s+crédito|crédito\s+solicitado)\b",
+            r"\b(abri\s+na\s+semana|abri\s+ontem|abri\s+hoje|abri\s+na\s+quinta|abri\s+na\s+sexta)\b",
+            r"\b(já\s+há|já\s+existe|já\s+tem|já\s+foi)\b",
+            r"\b(alguma\s+atualização|atualização|novidade|informação)\b",
+            r"\b(referente\s+à|sobre\s+a|relacionado\s+à|sobre\s+o)\b",
+            r"\b(saber\s+se|gostaria\s+de\s+saber|quero\s+saber|preciso\s+saber)\b",
         ]
 
         self.improdutivo_patterns = [
@@ -188,42 +194,141 @@ class FinancialEmailClassifier:
         self, email_text: str, processed_text: str
     ) -> Dict[str, Any]:
         """
-        Classifica usando texto já processado
+        Classificação híbrida: combina IA e regras com votação ponderada
         """
+        results = []
+
+        # 1. Classificação por regras (sempre disponível)
+        rules_result = self._classify_by_rules(email_text)
+        results.append(
+            {
+                "category": rules_result["category"],
+                "confidence": rules_result["confidence"],
+                "method": "rules",
+                "weight": 0.6,  # Peso maior para regras (mais confiável)
+                "reasoning": rules_result["reasoning"],
+            }
+        )
+
+        # 2. Classificação OpenAI (se disponível)
         if self.openai_client.is_available():
             try:
                 openai_result = self.openai_client.classify_email(processed_text)
                 if (
-                    openai_result
-                    and openai_result.get("confidence", 0) > MIN_CONFIDENCE_OPENAI
-                ):
-                    return {
-                        "category": openai_result["category"],
-                        "confidence": openai_result["confidence"],
-                        "method": "openai",
-                        "reasoning": openai_result.get("reasoning", ""),
-                    }
+                    openai_result and openai_result.get("confidence", 0) > 0.3
+                ):  # Threshold mais baixo
+                    results.append(
+                        {
+                            "category": openai_result["category"],
+                            "confidence": openai_result["confidence"],
+                            "method": "openai",
+                            "weight": 0.3,  # Peso médio para OpenAI
+                            "reasoning": openai_result.get("reasoning", ""),
+                        }
+                    )
             except Exception as e:
                 logger.error(f"Erro na classificação OpenAI: {e}")
 
+        # 3. Classificação Hugging Face (se disponível)
         if self.huggingface_client and self.huggingface_client.is_available():
             try:
                 hf_result = self.huggingface_client.classify_email(processed_text)
                 if (
-                    hf_result
-                    and hf_result.get("confidence", 0)
-                    > config.HUGGINGFACE_CONFIDENCE_THRESHOLD
-                ):
-                    return {
-                        "category": hf_result["category"],
-                        "confidence": hf_result["confidence"],
-                        "method": "huggingface",
-                        "reasoning": hf_result.get("reasoning", ""),
-                    }
+                    hf_result and hf_result.get("confidence", 0) > 0.2
+                ):  # Threshold mais baixo
+                    # Converter score de estrelas (1-5) para confiança (0-1)
+                    stars = hf_result.get("confidence", 0)
+                    if stars <= 2:
+                        hf_category = "improdutivo"
+                        hf_confidence = (
+                            3 - stars
+                        ) / 3  # Inverter: 1 estrela = alta confiança para improdutivo
+                    else:
+                        hf_category = "produtivo"
+                        hf_confidence = (
+                            stars - 2
+                        ) / 3  # 5 estrelas = alta confiança para produtivo
+
+                    results.append(
+                        {
+                            "category": hf_category,
+                            "confidence": hf_confidence,
+                            "method": "huggingface",
+                            "weight": 0.1,  # Peso menor para HF
+                            "reasoning": hf_result.get("reasoning", ""),
+                        }
+                    )
             except Exception as e:
                 logger.error(f"Erro na classificação Hugging Face: {e}")
 
-        return self._classify_by_rules(email_text)
+        # 4. Votação ponderada
+        return self._weighted_vote(results)
+
+    def _weighted_vote(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Sistema de votação ponderada para combinar diferentes classificadores
+        """
+        if not results:
+            return {
+                "category": "improdutivo",
+                "confidence": 0.5,
+                "method": "fallback",
+                "reasoning": "Nenhum classificador disponível",
+            }
+
+        if len(results) == 1:
+            return results[0]
+
+        # Calcular scores ponderados
+        produtivo_score = 0.0
+        improdutivo_score = 0.0
+        total_weight = 0.0
+        methods_used = []
+        reasoning_parts = []
+
+        for result in results:
+            weight = result["weight"]
+            confidence = result["confidence"]
+            category = result["category"]
+            method = result["method"]
+            reasoning = result.get("reasoning", "")
+
+            # Score ponderado = peso * confiança
+            weighted_score = weight * confidence
+
+            if category == "produtivo":
+                produtivo_score += weighted_score
+            else:
+                improdutivo_score += weighted_score
+
+            total_weight += weight
+            methods_used.append(method)
+            if reasoning:
+                reasoning_parts.append(f"{method}: {reasoning}")
+
+        # Normalizar scores
+        if total_weight > 0:
+            produtivo_score /= total_weight
+            improdutivo_score /= total_weight
+
+        # Determinar categoria final
+        if produtivo_score > improdutivo_score:
+            final_category = "produtivo"
+            final_confidence = min(0.95, produtivo_score + 0.1)  # Boost de confiança
+        else:
+            final_category = "improdutivo"
+            final_confidence = min(0.95, improdutivo_score + 0.1)
+
+        # Método híbrido
+        methods_str = "+".join(methods_used)
+
+        return {
+            "category": final_category,
+            "confidence": final_confidence,
+            "method": f"hybrid({methods_str})",
+            "reasoning": f"Votação ponderada: {produtivo_score:.2f} produtivo vs {improdutivo_score:.2f} improdutivo. "
+            + "; ".join(reasoning_parts),
+        }
 
     def _suggest_actions(self, category: str) -> List[str]:
         """Sugere ações baseadas na categoria"""
