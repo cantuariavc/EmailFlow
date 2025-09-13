@@ -79,7 +79,4 @@ def _extract_email_text():
             400,
         )
 
-    if len(email_text) < config.MIN_TEXT_LENGTH:
-        return jsonify({"error": "Email muito curto para análise"}), 400
-
     return email_text
